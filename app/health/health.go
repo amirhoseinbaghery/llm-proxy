@@ -1,6 +1,7 @@
 package health
 
 import (
+	"io"
 	"net/http"
 	"os"
 	"time"
@@ -31,7 +32,12 @@ func HealthzHandler(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, "llm unreachable", http.StatusBadGateway)
 		return
 	}
-	defer resp.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+
+		}
+	}(resp.Body)
 
 	if resp.StatusCode == http.StatusOK {
 		w.WriteHeader(http.StatusOK)
