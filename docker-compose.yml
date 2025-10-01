@@ -1,0 +1,11 @@
+services:
+  llm-proxy:
+    build: .
+    image: llm-proxy:dev
+    container_name: llm-proxy
+    ports:
+      - "8080:8080"
+    environment:
+      - LISTEN_ADDR=:8080
+      - LLM_BASE_URL=http://10.10.1.1/v1
+    restart: unless-stopped
