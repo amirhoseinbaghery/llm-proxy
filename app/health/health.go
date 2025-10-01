@@ -23,13 +23,17 @@ func HealthzHandler(w http.ResponseWriter, _ *http.Request) {
 
 	req, err := http.NewRequest(http.MethodGet, base+"/models", nil)
 	if err != nil {
-		http.Error(w, "request build error", http.StatusInternalServerError)
+		http.Error(w, "request build error: "+err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	if bearer := os.Getenv("LLM_HEALTH_BEARER"); bearer != "" {
+		req.Header.Set("Authorization", "Bearer "+bearer)
 	}
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		http.Error(w, "llm unreachable", http.StatusBadGateway)
+		http.Error(w, "llm unreachable: "+err.Error(), http.StatusBadGateway)
 		return
 	}
 	defer func(Body io.ReadCloser) {
@@ -39,10 +43,7 @@ func HealthzHandler(w http.ResponseWriter, _ *http.Request) {
 		}
 	}(resp.Body)
 
-	if resp.StatusCode == http.StatusOK {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("ok"))
-		return
-	}
-	http.Error(w, "llm unhealthy", http.StatusBadGateway)
+	body, _ := io.ReadAll(resp.Body)
+	w.WriteHeader(resp.StatusCode)
+	_, _ = w.Write(body)
 }
