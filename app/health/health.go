@@ -21,13 +21,13 @@ func HealthzHandler(w http.ResponseWriter, r *http.Request) {
 	apiKey := query.Get("apikey")
 
 	if model == "" || apiKey == "" {
-		http.Error(w, "model and apikey required", http.StatusBadRequest)
+		http.Error(w, `{"status":"unhealthy","error":"model and apikey required"}`, http.StatusBadRequest)
 		return
 	}
 
 	base := os.Getenv("LLM_BASE_URL")
 	if base == "" {
-		http.Error(w, "LLM_BASE_URL not set", http.StatusServiceUnavailable)
+		http.Error(w, `{"status":"unhealthy","error":"LLM_BASE_URL not set"}`, http.StatusServiceUnavailable)
 		return
 	}
 
@@ -36,7 +36,7 @@ func HealthzHandler(w http.ResponseWriter, r *http.Request) {
 	payload := map[string]interface{}{
 		"model": model,
 		"messages": []map[string]string{
-			{"role": "user", "content": "if you are ok say 'I'm alive, damn it'"},
+			{"role": "user", "content": "healthcheck"},
 		},
 		"max_tokens": 1,
 	}
@@ -45,7 +45,7 @@ func HealthzHandler(w http.ResponseWriter, r *http.Request) {
 
 	req, err := http.NewRequest(http.MethodPost, endpoint, bytes.NewReader(jsonData))
 	if err != nil {
-		http.Error(w, "request build error: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, `{"status":"unhealthy","error":"`+err.Error()+`"}`, http.StatusInternalServerError)
 		return
 	}
 
@@ -54,7 +54,7 @@ func HealthzHandler(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		http.Error(w, "llm unreachable: "+err.Error(), http.StatusBadGateway)
+		http.Error(w, `{"status":"unhealthy","error":"`+err.Error()+`"}`, http.StatusBadGateway)
 		return
 	}
 	defer func(Body io.ReadCloser) {
@@ -65,6 +65,21 @@ func HealthzHandler(w http.ResponseWriter, r *http.Request) {
 	}(resp.Body)
 
 	body, _ := io.ReadAll(resp.Body)
-	w.WriteHeader(resp.StatusCode)
-	_, _ = w.Write(body)
+
+	if resp.StatusCode != http.StatusOK {
+		w.WriteHeader(resp.StatusCode)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"status": "unhealthy",
+			"error":  string(body),
+		})
+		return
+	}
+
+	// موفق بود
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":  "healthy",
+		"model":   model,
+		"message": "I'm alive, damn it",
+	})
 }
