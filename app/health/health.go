@@ -36,7 +36,7 @@ func HealthzHandler(w http.ResponseWriter, r *http.Request) {
 	payload := map[string]interface{}{
 		"model": model,
 		"messages": []map[string]string{
-			{"role": "user", "content": "ping"},
+			{"role": "user", "content": "if you are ok say 'I'm alive, damn it'"},
 		},
 		"max_tokens": 1,
 	}
