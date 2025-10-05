@@ -57,7 +57,12 @@ func HealthzHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "llm unreachable: "+err.Error(), http.StatusBadGateway)
 		return
 	}
-	defer resp.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+
+		}
+	}(resp.Body)
 
 	body, _ := io.ReadAll(resp.Body)
 	w.WriteHeader(resp.StatusCode)
