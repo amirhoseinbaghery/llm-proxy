@@ -16,12 +16,22 @@ func PingHandler(w http.ResponseWriter, _ *http.Request) {
 var httpClient = &http.Client{}
 
 func HealthzHandler(w http.ResponseWriter, r *http.Request) {
-	query := r.URL.Query()
-	model := query.Get("model")
-	apiKey := query.Get("apikey")
+	if r.Method != http.MethodPost {
+		http.Error(w, `{"status":"unhealthy","error":"Only POST method allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
 
-	if model == "" || apiKey == "" {
-		http.Error(w, `{"status":"unhealthy","error":"model and apikey required"}`, http.StatusBadRequest)
+	var input struct {
+		Model string `json:"model"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		http.Error(w, `{"status":"unhealthy","error":"invalid JSON body"}`, http.StatusBadRequest)
+		return
+	}
+
+	apiKey, ok := AllowedModels[input.Model]
+	if !ok {
+		http.Error(w, `{"status":"unhealthy","error":"model not allowed"}`, http.StatusBadRequest)
 		return
 	}
 
@@ -34,7 +44,7 @@ func HealthzHandler(w http.ResponseWriter, r *http.Request) {
 	endpoint := base + "/chat/completions"
 
 	payload := map[string]interface{}{
-		"model": model,
+		"model": input.Model,
 		"messages": []map[string]string{
 			{"role": "user", "content": "healthcheck"},
 		},
@@ -75,11 +85,10 @@ func HealthzHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// موفق بود
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"status":  "healthy",
-		"model":   model,
+		"model":   input.Model,
 		"message": "I'm alive, damn it",
 	})
 }
