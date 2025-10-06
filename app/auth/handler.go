@@ -190,7 +190,6 @@ func UpdateUserHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Write([]byte("user updated"))
 }
-
 func UpdateOwnPasswordHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPatch {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -205,7 +204,8 @@ func UpdateOwnPasswordHandler(w http.ResponseWriter, r *http.Request) {
 	username := usernameRaw.(string)
 
 	var req struct {
-		Password string `json:"password"`
+		OldPassword string `json:"old_password"`
+		NewPassword string `json:"new_password"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -213,7 +213,18 @@ func UpdateOwnPasswordHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	hashed, err := HashPassword(req.Password)
+	user, err := GetUserByUsername(username)
+	if err != nil {
+		http.Error(w, "user not found", http.StatusNotFound)
+		return
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.OldPassword)); err != nil {
+		http.Error(w, "invalid current password", http.StatusUnauthorized)
+		return
+	}
+
+	hashed, err := HashPassword(req.NewPassword)
 	if err != nil {
 		http.Error(w, "could not hash password", http.StatusInternalServerError)
 		return
