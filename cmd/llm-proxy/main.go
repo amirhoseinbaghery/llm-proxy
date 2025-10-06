@@ -11,7 +11,7 @@ import (
 )
 
 func main() {
-	auth.InitDB("llm-proxy.db")
+	auth.InitDB("/data/llm-proxy.db")
 	defer func(DB *sql.DB) {
 		err := DB.Close()
 		if err != nil {
