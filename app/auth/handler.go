@@ -135,3 +135,52 @@ func ListUsersHandler(w http.ResponseWriter, r *http.Request) {
 
 	json.NewEncoder(w).Encode(users)
 }
+
+func UpdateUserHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPatch {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Username    string  `json:"username"`
+		NewUsername *string `json:"new_username"`
+		Password    *string `json:"password"`
+		IsSuperuser *bool   `json:"is_superuser"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+
+	user, err := GetUserByUsername(req.Username)
+	if err != nil {
+		http.Error(w, "user not found", http.StatusNotFound)
+		return
+	}
+
+	if req.NewUsername != nil {
+		user.Username = *req.NewUsername
+	}
+	if req.Password != nil {
+		hashed, err := HashPassword(*req.Password)
+		if err != nil {
+			http.Error(w, "could not hash password", http.StatusInternalServerError)
+			return
+		}
+		user.PasswordHash = hashed
+	}
+	if req.IsSuperuser != nil {
+		user.IsSuperuser = *req.IsSuperuser
+	}
+
+	_, err = DB.Exec("UPDATE users SET username=?, password_hash=?, is_superuser=? WHERE id=?",
+		user.Username, user.PasswordHash, user.IsSuperuser, user.ID)
+	if err != nil {
+		http.Error(w, "update failed", http.StatusInternalServerError)
+		return
+	}
+
+	w.Write([]byte("user updated"))
+}
