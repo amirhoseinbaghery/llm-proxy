@@ -18,6 +18,7 @@ func NewMux() *http.ServeMux {
 	mux.Handle("/users", auth.JWTMiddleware(auth.SuperuserOnly(http.HandlerFunc(auth.ListUsersHandler))))
 	mux.Handle("/delete", auth.JWTMiddleware(auth.SuperuserOnly(http.HandlerFunc(auth.DeleteUserHandler))))
 	mux.Handle("/user/update/", auth.JWTMiddleware(auth.SuperuserOnly(http.HandlerFunc(auth.UpdateUserHandler))))
+	mux.Handle("/user/password", auth.JWTMiddleware(http.HandlerFunc(auth.UpdateOwnPasswordHandler)))
 
 	return mux
 }

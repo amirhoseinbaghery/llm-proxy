@@ -190,3 +190,40 @@ func UpdateUserHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Write([]byte("user updated"))
 }
+
+func UpdateOwnPasswordHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPatch {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	usernameRaw := r.Context().Value("username")
+	if usernameRaw == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	username := usernameRaw.(string)
+
+	var req struct {
+		Password string `json:"password"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+
+	hashed, err := HashPassword(req.Password)
+	if err != nil {
+		http.Error(w, "could not hash password", http.StatusInternalServerError)
+		return
+	}
+
+	_, err = DB.Exec("UPDATE users SET password_hash=? WHERE username=?", hashed, username)
+	if err != nil {
+		http.Error(w, "update failed", http.StatusInternalServerError)
+		return
+	}
+
+	w.Write([]byte("password updated"))
+}
