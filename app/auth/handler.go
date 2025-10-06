@@ -6,6 +6,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -142,21 +143,26 @@ func UpdateUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	parts := strings.Split(r.URL.Path, "/")
+	if len(parts) < 4 || parts[3] == "" {
+		http.Error(w, "missing username in path", http.StatusBadRequest)
+		return
+	}
+	username := parts[3]
+
+	user, err := GetUserByUsername(username)
+	if err != nil {
+		http.Error(w, "user not found", http.StatusNotFound)
+		return
+	}
+
 	var req struct {
-		Username    string  `json:"username"`
 		NewUsername *string `json:"new_username"`
 		Password    *string `json:"password"`
 		IsSuperuser *bool   `json:"is_superuser"`
 	}
-
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid request", http.StatusBadRequest)
-		return
-	}
-
-	user, err := GetUserByUsername(req.Username)
-	if err != nil {
-		http.Error(w, "user not found", http.StatusNotFound)
 		return
 	}
 
