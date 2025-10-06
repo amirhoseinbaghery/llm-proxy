@@ -20,7 +20,9 @@ func GenerateJWT(username string) (string, error) {
 }
 
 type Claims struct {
-	Username string `json:"username"`
+	ID          int    `json:"id"`
+	Username    string `json:"username"`
+	IsSuperuser bool   `json:"is_superuser"`
 	jwt.RegisteredClaims
 }
 

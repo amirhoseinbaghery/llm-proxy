@@ -10,6 +10,7 @@ type User struct {
 	ID           int
 	Username     string
 	PasswordHash string // hashed password
+	IsSuperuser  bool   `json:"is_superuser"`
 }
 
 var DB *sql.DB
@@ -25,7 +26,8 @@ func InitDB(dataSourceName string) {
 	CREATE TABLE IF NOT EXISTS users (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		username TEXT NOT NULL UNIQUE,
-		password_hash TEXT NOT NULL
+		password_hash TEXT NOT NULL,
+		is_superuser BOOLEAN DEFAULT FALSE
 	);
 	`
 	_, err = DB.Exec(schema)
@@ -37,14 +39,15 @@ func InitDB(dataSourceName string) {
 }
 
 func GetUserByUsername(username string) (*User, error) {
-	row := DB.QueryRow("SELECT id, username, password_hash FROM users WHERE username = ?", username)
+	row := DB.QueryRow("SELECT id, username, password_hash, is_superuser FROM users WHERE username = ?", username)
 	user := &User{}
-	err := row.Scan(&user.ID, &user.Username, &user.PasswordHash)
+	err := row.Scan(&user.ID, &user.Username, &user.PasswordHash, &user.IsSuperuser)
 	return user, err
 }
 
-func CreateUser(username, hashedPassword string) error {
-	_, err := DB.Exec("INSERT INTO users (username, password_hash) VALUES (?, ?)", username, hashedPassword)
+func CreateUser(username, hashedPassword string, isSuperuser bool) error {
+	_, err := DB.Exec("INSERT INTO users (username, password_hash, is_superuser) VALUES (?, ?, ?)",
+		username, hashedPassword, isSuperuser)
 	return err
 }
 
@@ -54,7 +57,7 @@ func DeleteUser(username string) error {
 }
 
 func ListUsers() ([]*User, error) {
-	rows, err := DB.Query("SELECT id, username, password_hash FROM users")
+	rows, err := DB.Query("SELECT id, username, password_hash, is_superuser FROM users")
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +66,7 @@ func ListUsers() ([]*User, error) {
 	var users []*User
 	for rows.Next() {
 		user := &User{}
-		if err := rows.Scan(&user.ID, &user.Username, &user.PasswordHash); err != nil {
+		if err := rows.Scan(&user.ID, &user.Username, &user.PasswordHash, &user.IsSuperuser); err != nil {
 			return nil, err
 		}
 		users = append(users, user)

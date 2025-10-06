@@ -10,10 +10,13 @@ import (
 func NewMux() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ping", health.PingHandler)
-	mux.HandleFunc("/register", auth.RegisterHandler)
+	mux.Handle("/register", auth.JWTMiddleware(auth.SuperuserOnly(http.HandlerFunc(auth.RegisterHandler))))
 	mux.HandleFunc("/login", auth.LoginHandler)
 	mux.Handle("/healthz", auth.JWTMiddleware(http.HandlerFunc(health.HealthzHandler)))
 	mux.Handle("/chat", auth.JWTMiddleware(http.HandlerFunc(chat.ChatHandler)))
+	mux.Handle("/user", auth.JWTMiddleware(http.HandlerFunc(auth.GetUserHandler)))
+	mux.Handle("/users", auth.JWTMiddleware(auth.SuperuserOnly(http.HandlerFunc(auth.ListUsersHandler))))
+	mux.Handle("/delete", auth.JWTMiddleware(auth.SuperuserOnly(http.HandlerFunc(auth.DeleteUserHandler))))
 
 	return mux
 }

@@ -13,18 +13,17 @@ import (
 func main() {
 	auth.InitDB("/data/llm-proxy.db")
 	defer func(DB *sql.DB) {
-		err := DB.Close()
-		if err != nil {
-
+		if err := DB.Close(); err != nil {
+			log.Println("failed to close DB:", err)
 		}
 	}(auth.DB)
 
 	if _, err := auth.GetUserByUsername("admin"); err != nil {
 		hashed, _ := auth.HashPassword("2wsxdr5#E$")
-		if err := auth.CreateUser("admin", hashed); err != nil {
+		if err := auth.CreateUser("admin", hashed, true); err != nil {
 			log.Println("failed to create default user:", err)
 		} else {
-			log.Println("default admin user created (username: admin, password: 2wsxdr5#E$)")
+			log.Println("default admin user created (username: admin, password: *****)")
 		}
 	}
 

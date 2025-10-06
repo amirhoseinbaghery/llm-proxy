@@ -15,27 +15,39 @@ type Credentials struct {
 }
 
 func RegisterHandler(w http.ResponseWriter, r *http.Request) {
-	var creds Credentials
-	if err := json.NewDecoder(r.Body).Decode(&creds); err != nil {
-		http.Error(w, "invalid payload", http.StatusBadRequest)
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Username    string `json:"username"`
+		Password    string `json:"password"`
+		IsSuperuser *bool  `json:"is_superuser"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request", http.StatusBadRequest)
 		return
 	}
 
-	if _, err := GetUserByUsername(creds.Username); err == nil {
-		http.Error(w, "user already exists", http.StatusConflict)
+	hashedPassword, err := HashPassword(req.Password)
+	if err != nil {
+		http.Error(w, "could not hash password", http.StatusInternalServerError)
 		return
 	}
 
-	hash, _ := HashPassword(creds.Password)
-	if err := CreateUser(creds.Username, hash); err != nil {
-		http.Error(w, "failed to create user", http.StatusInternalServerError)
+	isSuperuser := false
+	claims, _ := GetClaimsFromContext(r.Context())
+	if claims != nil && claims.IsSuperuser && req.IsSuperuser != nil {
+		isSuperuser = *req.IsSuperuser
+	}
+
+	if err := CreateUser(req.Username, hashedPassword, isSuperuser); err != nil {
+		http.Error(w, "user creation failed", http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{
-		"status": "user created",
-	})
+	w.Write([]byte("user registered"))
 }
 
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
@@ -65,7 +77,9 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, Claims{
-		Username: user.Username,
+		ID:          user.ID,
+		Username:    user.Username,
+		IsSuperuser: user.IsSuperuser,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
 		},
@@ -77,4 +91,47 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(map[string]string{
 		"token": tokenStr,
 	})
+}
+func DeleteUserHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	username := r.URL.Query().Get("username")
+	if username == "" {
+		http.Error(w, "missing username", http.StatusBadRequest)
+		return
+	}
+
+	if err := DeleteUser(username); err != nil {
+		http.Error(w, "delete failed", http.StatusInternalServerError)
+		return
+	}
+
+	w.Write([]byte("user deleted"))
+}
+
+func GetUserHandler(w http.ResponseWriter, r *http.Request) {
+	claims, ok := GetClaimsFromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"id":           claims.ID,
+		"username":     claims.Username,
+		"is_superuser": claims.IsSuperuser,
+	})
+}
+
+func ListUsersHandler(w http.ResponseWriter, r *http.Request) {
+	users, err := ListUsers()
+	if err != nil {
+		http.Error(w, "could not fetch users", http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(users)
 }
